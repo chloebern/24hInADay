@@ -245,7 +245,11 @@ declare global {
 }
 
 function createDriver(): DbDriver {
-  const url = process.env.DATABASE_URL;
+  const url =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING;
   if (url && url.startsWith("postgres")) {
     return new PgDriver(url);
   }
