@@ -1,4 +1,4 @@
-import type { Category, Entry } from "@/lib/db";
+import type { Group, Tag, Entry } from "@/lib/db";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -12,26 +12,50 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export function getCategories(): Promise<Category[]> {
-  return request("/api/categories");
+export function getGroups(): Promise<Group[]> {
+  return request("/api/groups");
 }
 
-export function createCategory(name: string, color: string): Promise<Category> {
-  return request("/api/categories", {
-    method: "POST",
-    body: JSON.stringify({ name, color }),
-  });
+export function createGroup(name: string, color: string): Promise<Group> {
+  return request("/api/groups", { method: "POST", body: JSON.stringify({ name, color }) });
 }
 
-export function updateCategory(id: string, name: string, color: string): Promise<void> {
-  return request(`/api/categories/${id}`, {
+export function updateGroup(id: string, name: string, color: string): Promise<void> {
+  return request(`/api/groups/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ name, color }),
   });
 }
 
-export function deleteCategory(id: string): Promise<void> {
-  return request(`/api/categories/${id}`, { method: "DELETE" });
+export function deleteGroup(id: string): Promise<void> {
+  return request(`/api/groups/${id}`, { method: "DELETE" });
+}
+
+export function getTags(): Promise<Tag[]> {
+  return request("/api/tags");
+}
+
+export function createTag(name: string, color: string, groupIds: string[]): Promise<Tag> {
+  return request("/api/tags", {
+    method: "POST",
+    body: JSON.stringify({ name, color, group_ids: groupIds }),
+  });
+}
+
+export function updateTag(
+  id: string,
+  name: string,
+  color: string,
+  groupIds: string[]
+): Promise<void> {
+  return request(`/api/tags/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name, color, group_ids: groupIds }),
+  });
+}
+
+export function deleteTag(id: string): Promise<void> {
+  return request(`/api/tags/${id}`, { method: "DELETE" });
 }
 
 export function getEntries(start: string, end: string): Promise<Entry[]> {
@@ -42,22 +66,16 @@ export type EntryInput = {
   date: string;
   start_time: string;
   end_time: string;
-  category_id: string;
+  tag_ids: string[];
   note: string | null;
 };
 
 export function createEntry(input: EntryInput): Promise<{ id: string }> {
-  return request("/api/entries", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return request("/api/entries", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateEntry(id: string, input: EntryInput): Promise<void> {
-  return request(`/api/entries/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
+  return request(`/api/entries/${id}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
 export function deleteEntry(id: string): Promise<void> {

@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import type { Category, Entry } from "@/lib/db";
-import { getCategories, getEntries } from "@/lib/api-client";
+import type { Group, Tag, Entry } from "@/lib/db";
+import { getGroups, getTags, getEntries } from "@/lib/api-client";
 import { toDateKey, addDays, formatNiceDate, minutesSinceMidnight, formatDuration } from "@/lib/dates";
 import DayTimeline from "@/components/DayTimeline";
 import EntryForm from "@/components/EntryForm";
 
 export default function DayPage() {
   const [dateKey, setDateKey] = useState(() => toDateKey(new Date()));
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
   const refresh = useCallback(async () => {
-    const [cats, ents] = await Promise.all([
-      getCategories(),
+    const [grps, tgs, ents] = await Promise.all([
+      getGroups(),
+      getTags(),
       getEntries(dateKey, dateKey),
     ]);
-    setCategories(cats);
+    setGroups(grps);
+    setTags(tgs);
     setEntries(ents);
     setLoading(false);
   }, [dateKey]);
@@ -106,13 +109,14 @@ export default function DayPage() {
           Loading…
         </div>
       ) : (
-        <DayTimeline entries={entries} categories={categories} onEntryClick={openEditEntry} />
+        <DayTimeline entries={entries} tags={tags} onEntryClick={openEditEntry} />
       )}
 
       {formOpen && (
         <EntryForm
           date={dateKey}
-          categories={categories}
+          groups={groups}
+          tags={tags}
           entry={editingEntry}
           onClose={closeForm}
           onSaved={handleSaved}

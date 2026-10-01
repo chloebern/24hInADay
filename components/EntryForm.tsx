@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Category, Entry } from "@/lib/db";
+import type { Group, Tag, Entry } from "@/lib/db";
 import { createEntry, updateEntry, deleteEntry } from "@/lib/api-client";
 
 type Props = {
   date: string;
-  categories: Category[];
+  groups: Group[];
+  tags: Tag[];
   entry?: Entry | null;
   defaultStart?: string;
   defaultEnd?: string;
@@ -16,7 +17,8 @@ type Props = {
 
 export default function EntryForm({
   date,
-  categories,
+  groups,
+  tags,
   entry,
   defaultStart,
   defaultEnd,
@@ -25,22 +27,41 @@ export default function EntryForm({
 }: Props) {
   const [startTime, setStartTime] = useState(entry?.start_time || defaultStart || "09:00");
   const [endTime, setEndTime] = useState(entry?.end_time || defaultEnd || "10:00");
-  const [categoryId, setCategoryId] = useState(
-    entry?.category_id || categories[0]?.id || ""
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    new Set(entry?.tag_ids || [])
   );
   const [note, setNote] = useState(entry?.note || "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  function toggleTag(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const groupedTags = groups.map((group) => ({
+    group,
+    tags: tags.filter((t) => t.group_ids.includes(group.id)),
+  }));
+  const ungroupedTags = tags.filter((t) => t.group_ids.length === 0);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (selectedIds.size === 0) {
+      setError("Pick at least one tag");
+      return;
+    }
     setSaving(true);
     setError(null);
     const input = {
       date,
       start_time: startTime,
       end_time: endTime,
-      category_id: categoryId,
+      tag_ids: Array.from(selectedIds),
       note: note.trim() || null,
     };
     try {
@@ -73,65 +94,122 @@ export default function EntryForm({
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/30 sm:items-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-t-2xl bg-white p-6 shadow-xl sm:rounded-2xl"
+        className="flex max-h-[90vh] w-full max-w-sm flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
       >
-        <h2 className="mb-4 text-base font-semibold text-neutral-900">
-          {entry ? "Edit entry" : "New entry"}
-        </h2>
+        <div className="overflow-y-auto p-6">
+          <h2 className="mb-4 text-base font-semibold text-neutral-900">
+            {entry ? "Edit entry" : "New entry"}
+          </h2>
 
-        <div className="flex gap-3">
-          <label className="flex-1 text-sm text-neutral-600">
-            Start
+          <div className="flex gap-3">
+            <label className="flex-1 text-sm text-neutral-600">
+              Start
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+                className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="flex-1 text-sm text-neutral-600">
+              End
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                required
+                className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4">
+            <p className="mb-2 text-sm text-neutral-600">
+              Tags {selectedIds.size > 0 && <span className="text-neutral-400">({selectedIds.size} selected)</span>}
+            </p>
+            <div className="space-y-3">
+              {groupedTags
+                .filter((g) => g.tags.length > 0)
+                .map(({ group, tags: groupTags }) => (
+                  <div key={group.id}>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: group.color }}
+                      />
+                      <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                        {group.name}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {groupTags.map((tag) => {
+                        const selected = selectedIds.has(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => toggleTag(tag.id)}
+                            className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                            style={
+                              selected
+                                ? { backgroundColor: tag.color, borderColor: tag.color, color: "white" }
+                                : { borderColor: tag.color, color: tag.color, backgroundColor: "white" }
+                            }
+                          >
+                            {tag.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+              {ungroupedTags.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400">
+                    Other
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ungroupedTags.map((tag) => {
+                      const selected = selectedIds.has(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.id)}
+                          className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                          style={
+                            selected
+                              ? { backgroundColor: tag.color, borderColor: tag.color, color: "white" }
+                              : { borderColor: tag.color, color: tag.color, backgroundColor: "white" }
+                          }
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <label className="mt-4 block text-sm text-neutral-600">
+            Note (optional)
             <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              required
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. mask alignment"
               className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
             />
           </label>
-          <label className="flex-1 text-sm text-neutral-600">
-            End
-            <input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              required
-              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-            />
-          </label>
+
+          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
 
-        <label className="mt-3 block text-sm text-neutral-600">
-          Category
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            required
-            className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="mt-3 block text-sm text-neutral-600">
-          Note (optional)
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. mask alignment"
-            className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-          />
-        </label>
-
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-
-        <div className="mt-5 flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 border-t border-neutral-100 p-4">
           <div>
             {entry && (
               <button

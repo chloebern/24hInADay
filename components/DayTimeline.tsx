@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Category, Entry } from "@/lib/db";
+import type { Tag, Entry } from "@/lib/db";
 import { minutesSinceMidnight, formatDuration } from "@/lib/dates";
 
 const HOUR_HEIGHT = 56; // px per hour
@@ -9,11 +9,11 @@ const TOTAL_HEIGHT = HOUR_HEIGHT * 24;
 
 type Props = {
   entries: Entry[];
-  categories: Category[];
+  tags: Tag[];
   onEntryClick: (entry: Entry) => void;
 };
 
-export default function DayTimeline({ entries, categories, onEntryClick }: Props) {
+export default function DayTimeline({ entries, tags, onEntryClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function DayTimeline({ entries, categories, onEntryClick }: Props
     }
   }, []);
 
-  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const tagById = new Map(tags.map((t) => [t.id, t]));
 
   return (
     <div
@@ -44,11 +44,15 @@ export default function DayTimeline({ entries, categories, onEntryClick }: Props
 
         <div className="absolute inset-y-0 left-14 right-2">
           {entries.map((entry) => {
-            const cat = categoryById.get(entry.category_id);
+            const entryTags = entry.tag_ids.map((id) => tagById.get(id)).filter(Boolean) as Tag[];
+            const primary = entryTags[0];
             const startMin = minutesSinceMidnight(entry.start_time);
             const endMin = minutesSinceMidnight(entry.end_time);
             const top = (startMin / 60) * HOUR_HEIGHT;
             const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 18);
+            const label = entryTags.length > 0
+              ? entryTags.map((t) => t.name).join(" + ")
+              : "Unknown";
             return (
               <button
                 key={entry.id}
@@ -57,11 +61,11 @@ export default function DayTimeline({ entries, categories, onEntryClick }: Props
                 style={{
                   top,
                   height,
-                  backgroundColor: cat?.color || "#898781",
+                  backgroundColor: primary?.color || "#898781",
                 }}
               >
                 <div className="font-medium">
-                  {cat?.name || "Unknown"} · {entry.start_time}–{entry.end_time}
+                  {label} · {entry.start_time}–{entry.end_time}
                 </div>
                 {height > 32 && (
                   <div className="opacity-80">

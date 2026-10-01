@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import type { Category, Entry } from "@/lib/db";
-import { getCategories, getEntries } from "@/lib/api-client";
+import type { Tag, Entry } from "@/lib/db";
+import { getTags, getEntries } from "@/lib/api-client";
 import {
   toDateKey,
-  parseDateKey,
   addDays,
   addMonths,
   startOfWeek,
@@ -30,7 +29,7 @@ const PERIODS: { key: Period; label: string }[] = [
 export default function StatsPage() {
   const [period, setPeriod] = useState<Period>("day");
   const [refDate, setRefDate] = useState(() => new Date());
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,8 +53,8 @@ export default function StatsPage() {
   }, [period, refDate]);
 
   const refresh = useCallback(async () => {
-    const [cats, ents] = await Promise.all([getCategories(), getEntries(startKey, endKey)]);
-    setCategories(cats);
+    const [tgs, ents] = await Promise.all([getTags(), getEntries(startKey, endKey)]);
+    setTags(tgs);
     setEntries(ents);
     setLoading(false);
   }, [startKey, endKey]);
@@ -71,29 +70,38 @@ export default function StatsPage() {
     else setRefDate((d) => addMonths(d, delta));
   }
 
-  const rows = categories.map((cat) => ({
-    id: cat.id,
-    name: cat.name,
-    color: cat.color,
-    minutes: entries
-      .filter((e) => e.category_id === cat.id)
-      .reduce(
-        (sum, e) => sum + (minutesSinceMidnight(e.end_time) - minutesSinceMidnight(e.start_time)),
-        0
-      ),
-  }));
+  const entryDuration = (e: Entry) =>
+    minutesSinceMidnight(e.end_time) - minutesSinceMidnight(e.start_time);
 
-  const unknownMinutes = entries
-    .filter((e) => !categories.some((c) => c.id === e.category_id))
-    .reduce(
-      (sum, e) => sum + (minutesSinceMidnight(e.end_time) - minutesSinceMidnight(e.start_time)),
-      0
+  const tagMinutes = new Map<string, number>();
+  let unknownMinutes = 0;
+  const tagById = new Map(tags.map((t) => [t.id, t]));
+  for (const entry of entries) {
+    const duration = entryDuration(entry);
+    if (entry.tag_ids.length === 0) {
+      unknownMinutes += duration;
+      continue;
+    }
+    for (const tagId of entry.tag_ids) {
+      if (!tagById.has(tagId)) {
+        unknownMinutes += duration;
+        continue;
+      }
+      tagMinutes.set(tagId, (tagMinutes.get(tagId) || 0) + duration);
+    }
+  }
+
+  const rows = tags
+    .map((tag) => ({ id: tag.id, name: tag.name, color: tag.color, minutes: tagMinutes.get(tag.id) || 0 }))
+    .concat(
+      unknownMinutes > 0
+        ? [{ id: "unknown", name: "Unknown", color: "#898781", minutes: unknownMinutes }]
+        : []
     );
-  const allRows = unknownMinutes > 0
-    ? [...rows, { id: "unknown", name: "Unknown", color: "#898781", minutes: unknownMinutes }]
-    : rows;
 
-  const totalMinutes = allRows.reduce((sum, r) => sum + r.minutes, 0);
+  // Total tracked is based on entries directly, not summed tag buckets,
+  // since a multi-tag entry's duration is credited in full to each of its tags.
+  const totalMinutes = entries.reduce((sum, e) => sum + entryDuration(e), 0);
 
   return (
     <div>
@@ -142,8 +150,11 @@ export default function StatsPage() {
             <p className="text-2xl font-semibold text-neutral-900">
               {formatDuration(totalMinutes)}
             </p>
+            <p className="mt-1 text-xs text-neutral-400">
+              Entries with multiple tags count fully toward each tag below, so the bars can add up to more than the total.
+            </p>
           </div>
-          <StatsChart rows={allRows} />
+          <StatsChart rows={rows} />
         </>
       )}
     </div>

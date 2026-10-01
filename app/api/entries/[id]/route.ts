@@ -7,10 +7,14 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const { date, start_time, end_time, category_id, note } = body;
+  const { date, start_time, end_time, note } = body;
+  const tag_ids: string[] = Array.isArray(body.tag_ids) ? body.tag_ids.map(String) : [];
 
-  if (!date || !start_time || !end_time || !category_id) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  if (!date || !start_time || !end_time || tag_ids.length === 0) {
+    return NextResponse.json(
+      { error: "Missing required fields (need at least one tag)" },
+      { status: 400 }
+    );
   }
   if (end_time <= start_time) {
     return NextResponse.json(
@@ -20,14 +24,10 @@ export async function PATCH(
   }
 
   const db = getDb();
-  await db.updateEntry({
-    id,
-    date,
-    start_time,
-    end_time,
-    category_id,
-    note: note || null,
-  });
+  await db.updateEntry(
+    { id, date, start_time, end_time, note: note || null },
+    tag_ids
+  );
   return NextResponse.json({ ok: true });
 }
 

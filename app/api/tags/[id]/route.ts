@@ -9,13 +9,14 @@ export async function PATCH(
   const body = await request.json().catch(() => ({}));
   const name = String(body.name || "").trim();
   const color = String(body.color || "");
+  const groupIds = Array.isArray(body.group_ids) ? body.group_ids.map(String) : [];
 
   if (!name || !color) {
     return NextResponse.json({ error: "Name and color are required" }, { status: 400 });
   }
 
   const db = getDb();
-  await db.updateCategory(id, name, color);
+  await db.updateTag(id, name, color, groupIds);
   return NextResponse.json({ ok: true });
 }
 
@@ -25,6 +26,6 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const db = getDb();
-  await db.deleteCategory(id);
+  await db.deleteTag(id);
   return NextResponse.json({ ok: true });
 }
